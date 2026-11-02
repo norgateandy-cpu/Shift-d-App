@@ -1414,4 +1414,87 @@ window.initializeUKMap=function(){render()};window.renderUKMap=function(){render
 // Keep map live after job updates without requesting remote tiles.
 render();
 })();
+</script>
+<style id="v61-cross-device-fixes">
+*,*::before,*::after{box-sizing:border-box}
+html,body{max-width:100%;overflow-x:clip}
+.shell,main,section,.card,.field,.grid2,.v42Grid,.v42Field{min-width:0;max-width:100%}
+.grid2>* , .v42Grid>*{min-width:0}
+.field input,.field select,.field textarea,.v42Field input,.v42Field select,.v42Field textarea{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+input[type="date"]{min-height:46px;max-width:100%;min-width:0;padding-inline:10px}
+#post .grid2,#route .grid2{align-items:start}
+#post .field,#route .field{min-width:0}
+#post .field label,#route .field label{display:block;overflow-wrap:anywhere}
+#quoteSortWrap{margin:12px 0 18px;padding:12px 14px;border:1px solid var(--line);background:var(--panel);border-radius:12px}
+#quoteSortWrap label{display:block;font-weight:700;margin-bottom:7px}
+#quoteSortWrap select{width:100%;max-width:420px;min-height:46px}
+#v61DevNote{padding:10px 13px;border:1px solid #3d6685;border-radius:10px;margin:12px 0;color:var(--muted);font-size:13px}
+#investorEntry{max-width:calc(100vw - 24px)}
+@media(max-width:700px){
+ #post .grid2,#route .grid2,.v42Grid{grid-template-columns:minmax(0,1fr)!important}
+ #post .grid2>.field,#route .grid2>.field{width:100%}
+ #post input[type="date"],#route input[type="date"]{width:100%;min-width:0}
+ #investorEntry{bottom:calc(104px + env(safe-area-inset-bottom,0px));right:8px;padding:8px 10px;font-size:11px}
+ .nav{padding-bottom:env(safe-area-inset-bottom,0px)}
+ .actions{flex-wrap:wrap}
+ .actions>.btn{min-width:0}
+}
+@media(min-width:1000px){.shell{width:min(100%,1200px);margin-inline:auto}}
+</style>
+<script id="v61-quotes-sort-and-dev-sync">
+(function(){
+ const sortOptions=[['newest','Newest quotes'],['low','Lowest price first'],['high','Highest price first'],['rating','Highest rated'],['reviews','Most reviews'],['name','Transporter A–Z']];
+ let currentSort='low';
+ function ensureSort(){
+  const list=document.getElementById('quoteList');
+  if(!list||document.getElementById('quoteSortWrap'))return;
+  const wrap=document.createElement('div');wrap.id='quoteSortWrap';
+  const label=document.createElement('label');label.htmlFor='v61QuoteSort';label.textContent='Sort customer quotes by';
+  const select=document.createElement('select');select.id='v61QuoteSort';
+  sortOptions.forEach(([value,name])=>{const o=document.createElement('option');o.value=value;o.textContent=name;select.appendChild(o)});
+  select.value=currentSort;select.addEventListener('change',()=>{currentSort=select.value;sortQuotes()});
+  wrap.append(label,select);list.parentNode.insertBefore(wrap,list);
+ }
+ function sortQuotes(){
+  const list=document.getElementById('quoteList');if(!list)return;
+  const cards=Array.from(list.querySelectorAll(':scope > .quote'));
+  function data(card){
+   const name=card.querySelector('strong')?.textContent?.trim()||'';
+   const q=typeof quotes!=='undefined'?quotes.find(x=>x.name===name):null;
+   const price=q?Number(q.price):Number((card.querySelector('.price')?.textContent||'').replace(/[^0-9.]/g,''))||0;
+   return {name,price,rating:Number(q?.rating)||0,reviews:Number(q?.reviews)||0,id:Number(q?.id)||0};
+  }
+  cards.sort((a,b)=>{
+   const x=data(a),y=data(b);
+   if(currentSort==='low')return x.price-y.price;
+   if(currentSort==='high')return y.price-x.price;
+   if(currentSort==='rating')return y.rating-x.rating||y.reviews-x.reviews;
+   if(currentSort==='reviews')return y.reviews-x.reviews;
+   if(currentSort==='name')return x.name.localeCompare(y.name);
+   return y.id-x.id;
+  }).forEach(card=>list.appendChild(card));
+ }
+ const oldRender=window.renderQuotes;
+ if(typeof oldRender==='function')window.renderQuotes=function(){oldRender.apply(this,arguments);ensureSort();sortQuotes()};
+ const oldPost=window.postJob;
+ if(typeof oldPost==='function')window.postJob=function(){
+  const before=Array.isArray(window.jobs)?window.jobs.length:jobs.length;
+  oldPost.apply(this,arguments);
+  if(jobs.length>before){
+   try{localStorage.setItem('shiftd-dev-last-job',String(jobs[0].id))}catch(e){}
+   const notice=document.getElementById('v61DevNote');
+   if(notice)notice.textContent='Development mode: your newly posted job is available in the transporter Discover view on this browser. Switch roles to test quoting.';
+  }
+ };
+ function init(){
+  ensureSort();sortQuotes();
+  const post=document.getElementById('post');
+  if(post&&!document.getElementById('v61DevNote')){
+   const p=document.createElement('div');p.id='v61DevNote';
+   p.textContent='Development testing: jobs posted here are stored on this device and can be viewed when you switch to transporter. Other devices do not share this data.';
+   post.insertBefore(p,post.firstChild.nextSibling);
+  }
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
 </script></body></html>
