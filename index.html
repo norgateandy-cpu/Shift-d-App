@@ -1524,7 +1524,7 @@ input[type="date"]{min-height:46px;max-width:100%;min-width:0;padding-inline:10p
  const quote=id=>wf.quotes.find(q=>String(q.id)===String(id));
  const ownQuoteList=()=>wf.quotes.filter(q=>isCustomer()?!!job(q.jobId):true);
  function note(t){if(typeof toast==='function')toast(t)}
- function root(){let host=document.getElementById('v62Workflow');if(host)return host;host=document.createElement('div');host.id='v62Workflow';const target=document.querySelector('main section:not(.hide)');if(!target)return null;target.insertBefore(host,target.firstChild);return host}
+ function root(){let host=document.getElementById('v62Workflow');const target=document.querySelector('main section:not(.hide)');if(!target)return null;if(!host){host=document.createElement('div');host.id='v62Workflow'}if(host.parentNode!==target)target.insertBefore(host,target.firstChild);return host}
  function display(){
   let host=root();if(!host)return;
   const mine=ownJobs();
@@ -1572,7 +1572,7 @@ input[type="date"]{min-height:46px;max-width:100%;min-width:0;padding-inline:10p
  const oldTab=setTab;
  setTab=function(t){oldTab.apply(this,arguments);display()};
  const oldReset=resetDemo;
- resetDemo=function(){oldReset.apply(this,arguments);if(jobs.length&&!jobs.some(j=>j.v62Customer)){wf={quotes:[],messages:[],bookings:[]};save()}display()};
+ resetDemo=function(){const prior=jobs.length;oldReset.apply(this,arguments);if(jobs.length!==prior&&!jobs.some(j=>j.v62Customer)){wf={quotes:[],messages:[],bookings:[]};save()}display()};
  function init(){display()}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
  window.__v62Test={getState:()=>JSON.parse(JSON.stringify(wf)),display,ownJobs};
