@@ -1758,7 +1758,7 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
    btn.type='button';btn.className='v66-marker'+(n>1?' cluster':'');btn.textContent=n>1?String(n):first.j.transportCategory==='prestige'?'◆':first.j.transportCategory==='enclosed'?'▣':'🚚';
    btn.style.left=(items.reduce((a,p)=>a+p.sx,0)/n)+'px';btn.style.top=(items.reduce((a,p)=>a+p.sy,0)/n)+'px';
    btn.title=n>1?n+' jobs':String(first.j.car||'Transport job');
-   btn.onclick=e=>{e.stopPropagation();if(n>1){center=mapCoords(first.j);z=clamp(z+2,4,17);render()}else if(typeof selectMapJob==='function')selectMapJob(first.j.id)};
+   btn.onclick=e=>{e.stopPropagation();if(n>1){center=mapCoords(first.j);z=clamp(z+2,4,17);render()}else if(typeof window.selectMapJob==='function')window.selectMapJob(first.j.id)};
    root.appendChild(btn);
   }
   const count=document.getElementById('mapCount');if(count)count.textContent=found.length+' mapped jobs';
