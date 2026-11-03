@@ -1718,6 +1718,8 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
  const root=document.getElementById('ukMap');if(!root)return;
  let mode='offline',z=6,center=[53.7,-2.7],pointer=null,loads=0,failures=0,generation=0;
  const offline=window.renderUKMap,offlineZoom=window.zoomMap;
+ let controls=document.getElementById('v64MapSwitch');
+ if(!controls){controls=document.createElement('div');controls.id='v64MapSwitch';controls.innerHTML='<button type="button" id="v64RoadBtn">Real road map</button><button type="button" id="v64OfflineBtn">Offline map</button><span id="v64MapStatus" role="status">Loading road map…</span>';root.parentNode.insertBefore(controls,root)}
  const status=document.getElementById('v64MapStatus');
  const say=t=>{if(status)status.textContent=t};
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -1762,7 +1764,7 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
   const count=document.getElementById('mapCount');if(count)count.textContent=found.length+' mapped jobs';
   if(!expected)restore('No road tiles in view. Offline map shown.');
  }
- function start(){mode='roads';z=6;center=[53.7,-2.7];render();say('Loading real road tiles…')}
+ function start(){mode='roads';z=6;center=[53.7,-2.7];say('Loading real road tiles…');render()}
  function zoom(d){z=clamp(z+d,4,17);render()}
  root.addEventListener('click',e=>{const b=e.target.closest('[data-v66]');if(!b||mode!=='roads')return;zoom(b.dataset.v66==='plus'?1:-1)});
  root.addEventListener('wheel',e=>{if(mode!=='roads')return;e.stopImmediatePropagation();e.preventDefault();zoom(e.deltaY<0?1:-1)},{passive:false,capture:true});
@@ -1775,5 +1777,6 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
  window.initializeUKMap=window.renderUKMap;
  window.zoomMap=function(d){if(mode==='roads')zoom(d);else if(typeof offlineZoom==='function')offlineZoom(d)};
  start();
+ window.__shiftdMapDiagnostics=()=>({mode,zoom:z,loadedTiles:loads,failedTiles:failures,visibleTiles:root.querySelectorAll('.v66-tiles img').length,status:status?.textContent||'',mapClass:root.className});
 })();
 </script></body></html>
