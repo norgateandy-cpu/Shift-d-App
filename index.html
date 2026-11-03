@@ -1596,6 +1596,7 @@ input[type="date"]{min-height:46px;max-width:100%;min-width:0;padding-inline:10p
 .v63Status{display:inline-block;border-radius:8px;padding:5px 8px;background:#234966;color:#e6f5ff;font-size:12px}
 .v63Thread summary{cursor:pointer;font-weight:750}
 @media(max-width:640px){.v63Grid{grid-template-columns:minmax(0,1fr)}.v63Box{padding:12px}.v63Actions button{flex:1 1 auto;max-width:100%}}
+ #quotes>.card,#quotes>#quoteSortWrap{display:none!important}
 </style>
 <script id="v63-unified-negotiation">
 (function(){
@@ -1653,9 +1654,9 @@ window.v63Send=()=>{
  const price=Number(document.getElementById('v63Price')?.value);
  const note=document.getElementById('v63Note')?.value.trim()||'';
  let t=byId(document.getElementById('v63Thread')?.value);
- if(!t&&selectedThread)t=byId(selectedThread);
+ if(!t&&document.getElementById('v63Thread')?.value)t=byId(selectedThread);
  if(!t&&(!id||!job(id)))return alert('Choose a job first.');
- if(t&&t.status==='Booked')return alert('This booking is already confirmed.');
+ if(t&&t.status==='Booked')return alert('This booking is already confirmed.');if(t&&t.status==='Declined'&&action!=='offer')return alert('This offer was declined. Send a new offer to continue.');
  if(action==='offer'){
   if(!Number.isFinite(price)||price<=0)return alert('Enter a valid offer amount.');
   if(!t){
@@ -1663,7 +1664,7 @@ window.v63Send=()=>{
    t={id:tid(),jobId:id,status:'Awaiting customer',events:[],updated:Date.now()};db.threads.push(t);
   }
   const last=t.events.filter(e=>e.kind==='offer').at(-1);
-  if(last&&last.from===actor())return alert('Wait for the other role to reply before sending another offer.');
+  if(last&&last.from===actor()&&t.status!=='Declined')return alert('Wait for the other role to reply before sending another offer.');
   t.events.push({kind:'offer',from:actor(),amount:price,note,at:Date.now()});
   t.status=actor()==='Customer'?'Awaiting transporter':'Awaiting customer';
  }else{
