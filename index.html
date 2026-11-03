@@ -1703,77 +1703,77 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
 #v64MapStatus{font-size:12px;color:#b9cfe1}
 @media(max-width:650px){#ukMap,#ukMap.v64-live .leaflet-container{min-height:350px;height:390px}#v64MapSwitch button{flex:1 1 auto}}
 </style>
-<script id="v64-real-map">
+<style id="v66-native-map-style">
+#ukMap.v66-live{position:relative;overflow:hidden;background:#dce8e8;touch-action:none;min-height:420px}
+#ukMap .v66-tiles{position:absolute;inset:0;overflow:hidden}
+#ukMap .v66-tiles img{position:absolute;width:256px;height:256px;max-width:none;pointer-events:none;user-select:none}
+#ukMap .v66-marker{position:absolute;z-index:3;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;border:2px solid white;background:#1379d0;color:white;display:grid;place-items:center;font-size:16px;font-weight:800;box-shadow:0 3px 10px #0006;cursor:pointer}
+#ukMap .v66-marker.cluster{background:#064977;width:46px;height:46px}
+#ukMap .v66-maptools{position:absolute;z-index:5;left:12px;top:12px;display:grid;gap:6px}
+#ukMap .v66-maptools button{background:#fff;color:#17344d;border:1px solid #b1c7d5;border-radius:8px;width:38px;height:38px;font-size:23px}
+#ukMap .v66-credit{position:absolute;z-index:4;bottom:2px;right:4px;background:#ffffffdf;color:#234;font-size:10px;padding:3px 5px}
+</style>
+<script id="v66-native-map">
 (function(){
  const root=document.getElementById('ukMap');if(!root)return;
- // The legacy offline map replaces root.innerHTML during rendering; keep the new controls outside it.
- // A separate map host prevents Leaflet from conflicting with the old SVG renderer.
- let map=null,layer=null,markers=null,errors=0,online=false;
- const offlineRender=window.renderUKMap,offlineZoom=window.zoomMap,offlineInit=window.initializeUKMap;
- const control=document.createElement('div');control.id='v64MapSwitch';
- control.innerHTML='<button type="button" id="v64RoadBtn">Real road map</button><button type="button" id="v64OfflineBtn">Offline map</button><span id="v64MapStatus">Offline map available. Real roads require internet.</span>';
- root.parentNode.insertBefore(control,root);
- const status=t=>{const e=document.getElementById('v64MapStatus');if(e)e.textContent=t};
- function fallback(message){
-  online=false;errors=0;
-  if(map){try{map.remove()}catch(e){}map=null}
-  root.classList.remove('v64-live');root.innerHTML='';
-  if(typeof offlineRender==='function')offlineRender();
-  status(message||'Offline illustrative map');
- }
- function refresh(){
-  if(!online||!map||!window.L)return;
-  if(markers){markers.clearLayers()}else markers=L.layerGroup().addTo(map);
-  const found=jobs.filter(j=>typeof mapCoords==='function'&&mapCoords(j));
-  const count=document.getElementById('mapCount');if(count)count.textContent=found.length+' mapped jobs';
-  const z=map.getZoom(),bucket=z<7?1.1:z<9?.35:z<11?.09:z<13?.025:0;
-  const groups=new Map();
+ let mode='offline',z=6,center=[53.7,-2.7],pointer=null,loads=0,failures=0,generation=0;
+ const offline=window.renderUKMap,offlineZoom=window.zoomMap;
+ const status=document.getElementById('v64MapStatus');
+ const say=t=>{if(status)status.textContent=t};
+ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+ const project=(lat,lon,zoom)=>{const n=256*Math.pow(2,zoom),sin=clamp(Math.sin(lat*Math.PI/180),-.9999,.9999);return [(lon+180)/360*n,(.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*n]};
+ const inverse=(x,y,zoom)=>{const n=256*Math.pow(2,zoom),lat=180/Math.PI*Math.atan(Math.sinh(Math.PI*(1-2*y/n)));return [lat,x/n*360-180]};
+ function restore(msg){mode='offline';generation++;root.classList.remove('v66-live');root.innerHTML='';if(typeof offline==='function')offline();say(msg||'Offline illustrative map');}
+ function render(){
+  if(mode!=='roads')return;
+  const gen=++generation;root.classList.add('v66-live');
+  const w=root.clientWidth||750,h=root.clientHeight||440,world=project(center[0],center[1],z);
+  const left=world[0]-w/2,top=world[1]-h/2;
+  root.innerHTML='<div class="v66-tiles"></div><div class="v66-maptools"><button type="button" data-v66="plus" aria-label="Zoom in">+</button><button type="button" data-v66="minus" aria-label="Zoom out">−</button></div><div class="v66-credit">© OpenStreetMap contributors · CARTO</div>';
+  const tiles=root.querySelector('.v66-tiles');
+  const minX=Math.floor(left/256),maxX=Math.floor((left+w)/256),minY=Math.floor(top/256),maxY=Math.floor((top+h)/256);
+  let expected=0;loads=0;failures=0;
+  for(let x=minX;x<=maxX;x++)for(let y=minY;y<=maxY;y++){
+   if(y<0||y>=2**z)continue;
+   expected++;
+   const img=document.createElement('img');img.alt='';img.loading='eager';img.decoding='async';
+   img.style.left=(x*256-left)+'px';img.style.top=(y*256-top)+'px';
+   img.onload=()=>{if(gen!==generation)return;loads++;if(loads===1)say('Real road map loaded · '+z+'× zoom')};
+   img.onerror=()=>{if(gen!==generation)return;failures++;if(failures>=Math.min(4,expected)&&loads===0)restore('Road tiles blocked by network. Offline map shown.')};
+   img.src='https://'+['a','b','c','d'][Math.abs(x+y)%4]+'.basemaps.cartocdn.com/rastertiles/voyager/'+z+'/'+((x%(2**z)+2**z)%(2**z))+'/'+y+'.png';
+   tiles.appendChild(img);
+  }
+  const found=jobs.filter(j=>typeof mapCoords==='function'&&mapCoords(j)),groups=new Map();
+  const bucket=z<7?55:z<9?40:z<12?30:0;
   for(const j of found){
-   const p=mapCoords(j),key=bucket?Math.round(p[0]/bucket)+':'+Math.round(p[1]/bucket):String(j.id);
-   if(!groups.has(key))groups.set(key,[]);groups.get(key).push(j);
+   const p=mapCoords(j),xy=project(p[0],p[1],z),sx=xy[0]-left,sy=xy[1]-top;
+   if(sx< -40||sx>w+40||sy< -40||sy>h+40)continue;
+   const key=bucket?Math.floor(sx/bucket)+':'+Math.floor(sy/bucket):String(j.id);
+   if(!groups.has(key))groups.set(key,[]);groups.get(key).push({j,sx,sy});
   }
-  for(const group of groups.values()){
-   const p=[group.reduce((v,j)=>v+mapCoords(j)[0],0)/group.length,group.reduce((v,j)=>v+mapCoords(j)[1],0)/group.length];
-   const many=group.length>1,j=group[0],cat=j.transportCategory||'open',symbol=many?group.length:cat==='prestige'?'◆':cat==='enclosed'?'▣':'🚚';
-   const html='<span class="'+(many?'cluster':'')+'">'+symbol+'</span>';
-   const marker=L.marker(p,{icon:L.divIcon({html,className:'v64-pin',iconSize:many?[46,46]:[38,38],iconAnchor:many?[23,23]:[19,19]})}).addTo(markers);
-   marker.on('click',()=>{if(many){map.flyTo(p,Math.min(map.getZoom()+2,16));return}if(typeof selectMapJob==='function')selectMapJob(j.id)});
-   if(!many)marker.bindTooltip(String(j.car||'Vehicle')+' · '+String(j.from||'')+' → '+String(j.to||''),{direction:'top'});
+  for(const items of groups.values()){
+   const first=items[0],n=items.length,btn=document.createElement('button');
+   btn.type='button';btn.className='v66-marker'+(n>1?' cluster':'');btn.textContent=n>1?String(n):first.j.transportCategory==='prestige'?'◆':first.j.transportCategory==='enclosed'?'▣':'🚚';
+   btn.style.left=(items.reduce((a,p)=>a+p.sx,0)/n)+'px';btn.style.top=(items.reduce((a,p)=>a+p.sy,0)/n)+'px';
+   btn.title=n>1?n+' jobs':String(first.j.car||'Transport job');
+   btn.onclick=e=>{e.stopPropagation();if(n>1){center=mapCoords(first.j);z=clamp(z+2,4,17);render()}else if(typeof selectMapJob==='function')selectMapJob(first.j.id)};
+   root.appendChild(btn);
   }
+  const count=document.getElementById('mapCount');if(count)count.textContent=found.length+' mapped jobs';
+  if(!expected)restore('No road tiles in view. Offline map shown.');
  }
- function live(){
-  if(online)return;
-  if(!window.L){loadLeaflet();return}
-  try{
-   if(typeof leafletMap!=='undefined'&&leafletMap){try{leafletMap.remove()}catch(e){}leafletMap=null}
-   root.innerHTML='';root.classList.add('v64-live');
-   map=L.map(root,{zoomControl:true,scrollWheelZoom:false,preferCanvas:true}).setView([54.1,-2.8],6);
-   online=true;errors=0;
-   layer=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19,maxNativeZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
-   layer.on('tileerror',()=>{errors++;if(errors>=5)fallback('Road tiles unavailable; switched to offline map.')});
-   layer.on('tileload',()=>{errors=0;status('Real roads and place labels · map tiles © OpenStreetMap / CARTO')});
-   map.on('zoomend moveend',refresh);
-   refresh();setTimeout(()=>{if(map)map.invalidateSize()},200);
-   status('Loading real road map…');
-  }catch(e){fallback('Road map unavailable; offline map shown.')}
- }
- document.getElementById('v64RoadBtn').addEventListener('click',live);
- document.getElementById('v64OfflineBtn').addEventListener('click',()=>fallback('Offline illustrative map selected.'));
- window.renderUKMap=function(){if(online)refresh();else if(typeof offlineRender==='function')offlineRender()};
- window.initializeUKMap=function(){if(online)refresh();else if(typeof offlineInit==='function')offlineInit()};
- window.zoomMap=function(d){if(online&&map)map.zoomIn(d>0?1:-1);else if(typeof offlineZoom==='function')offlineZoom(d)};
- // Default to real roads when the map library and network are available.
- function loadLeaflet(){
-  if(window.L){live();return}
-  status('Loading map engine…');
-  const urls=['https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
-  let i=0;
-  const next=()=>{
-   if(window.L){live();return}
-   if(i>=urls.length){fallback('Map engine blocked by browser or network. Offline map shown.');return}
-   const script=document.createElement('script');script.src=urls[i++];script.onload=()=>window.L?live():next();script.onerror=next;document.head.appendChild(script);
-  };next();
- }
- if(window.L)live();else loadLeaflet();
+ function start(){mode='roads';z=6;center=[53.7,-2.7];render();say('Loading real road tiles…')}
+ function zoom(d){z=clamp(z+d,4,17);render()}
+ root.addEventListener('click',e=>{const b=e.target.closest('[data-v66]');if(!b||mode!=='roads')return;zoom(b.dataset.v66==='plus'?1:-1)});
+ root.addEventListener('wheel',e=>{if(mode!=='roads')return;e.preventDefault();zoom(e.deltaY<0?1:-1)},{passive:false});
+ root.addEventListener('pointerdown',e=>{if(mode!=='roads'||e.target.closest('button'))return;pointer={x:e.clientX,y:e.clientY,center:[...center]};root.setPointerCapture(e.pointerId)});
+ root.addEventListener('pointerup',e=>{if(!pointer||mode!=='roads')return;const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;const xy=project(pointer.center[0],pointer.center[1],z);center=inverse(xy[0]-dx,xy[1]-dy,z);pointer=null;render()});
+ root.addEventListener('pointercancel',()=>{pointer=null});
+ document.getElementById('v64RoadBtn')?.addEventListener('click',start);
+ document.getElementById('v64OfflineBtn')?.addEventListener('click',()=>restore('Offline illustrative map selected.'));
+ window.renderUKMap=function(){if(mode==='roads')render();else if(typeof offline==='function')offline()};
+ window.initializeUKMap=window.renderUKMap;
+ window.zoomMap=function(d){if(mode==='roads')zoom(d);else if(typeof offlineZoom==='function')offlineZoom(d)};
+ start();
 })();
 </script></body></html>
