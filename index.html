@@ -1706,6 +1706,8 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
 <script id="v64-real-map">
 (function(){
  const root=document.getElementById('ukMap');if(!root)return;
+ // The legacy offline map replaces root.innerHTML during rendering; keep the new controls outside it.
+ // A separate map host prevents Leaflet from conflicting with the old SVG renderer.
  let map=null,layer=null,markers=null,errors=0,online=false;
  const offlineRender=window.renderUKMap,offlineZoom=window.zoomMap,offlineInit=window.initializeUKMap;
  const control=document.createElement('div');control.id='v64MapSwitch';
@@ -1741,8 +1743,9 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
  }
  function live(){
   if(online)return;
-  if(!window.L){fallback('Map library unavailable. Offline map shown.');return}
+  if(!window.L){loadLeaflet();return}
   try{
+   if(typeof leafletMap!=='undefined'&&leafletMap){try{leafletMap.remove()}catch(e){}leafletMap=null}
    root.innerHTML='';root.classList.add('v64-live');
    map=L.map(root,{zoomControl:true,scrollWheelZoom:false,preferCanvas:true}).setView([54.1,-2.8],6);
    online=true;errors=0;
@@ -1760,6 +1763,17 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
  window.initializeUKMap=function(){if(online)refresh();else if(typeof offlineInit==='function')offlineInit()};
  window.zoomMap=function(d){if(online&&map)map.zoomIn(d>0?1:-1);else if(typeof offlineZoom==='function')offlineZoom(d)};
  // Default to real roads when the map library and network are available.
- if(window.L)live();else window.addEventListener('load',()=>{if(window.L)live();else fallback('Offline map: mapping library unavailable.')},{once:true});
+ function loadLeaflet(){
+  if(window.L){live();return}
+  status('Loading map engine…');
+  const urls=['https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];
+  let i=0;
+  const next=()=>{
+   if(window.L){live();return}
+   if(i>=urls.length){fallback('Map engine blocked by browser or network. Offline map shown.');return}
+   const script=document.createElement('script');script.src=urls[i++];script.onload=()=>window.L?live():next();script.onerror=next;document.head.appendChild(script);
+  };next();
+ }
+ if(window.L)live();else loadLeaflet();
 })();
 </script></body></html>
