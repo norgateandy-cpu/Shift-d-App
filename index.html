@@ -1577,4 +1577,116 @@ input[type="date"]{min-height:46px;max-width:100%;min-width:0;padding-inline:10p
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
  window.__v62Test={getState:()=>JSON.parse(JSON.stringify(wf)),display,ownJobs};
 })();
+</script>
+<style id="v63-ui">
+#v63App{margin:14px 0 24px;display:grid;gap:14px}
+.v63Box{background:#10263b;border:1px solid #355675;border-radius:15px;padding:16px;min-width:0}
+.v63Box h3{margin:0 0 12px;color:#d6edff}
+.v63Grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.v63Grid label{display:grid;gap:5px;font-weight:650}
+.v63Grid input,.v63Grid select,.v63Grid textarea{width:100%;min-width:0;max-width:100%;min-height:44px;padding:10px;border-radius:9px;background:#19354d;color:#fff;border:1px solid #4b6984;font:inherit}
+.v63Grid textarea{min-height:72px}
+.v63Wide{grid-column:1/-1}
+.v63Actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.v63Actions button{min-height:43px}
+.v63Thread{border:1px solid #416581;border-radius:12px;margin:10px 0;padding:12px;min-width:0}
+.v63Event{border-left:3px solid #54b5ef;background:#18364e;border-radius:5px;padding:9px 12px;margin:9px 0;overflow-wrap:anywhere}
+.v63Event.mine{border-left-color:#80caa6}
+.v63Muted{color:#adc1d2;font-size:13px}
+.v63Status{display:inline-block;border-radius:8px;padding:5px 8px;background:#234966;color:#e6f5ff;font-size:12px}
+.v63Thread summary{cursor:pointer;font-weight:750}
+@media(max-width:640px){.v63Grid{grid-template-columns:minmax(0,1fr)}.v63Box{padding:12px}.v63Actions button{flex:1 1 auto;max-width:100%}}
+</style>
+<script id="v63-unified-negotiation">
+(function(){
+const STORE='shiftd-v63-negotiations';
+let db={threads:[]};try{const x=JSON.parse(localStorage.getItem(STORE)||'{}');if(Array.isArray(x.threads))db=x}catch(e){}
+let selectedThread=null;
+const persistV63=()=>{try{localStorage.setItem(STORE,JSON.stringify(db))}catch(e){}};
+const clean=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const amount=x=>'£'+Number(x).toLocaleString('en-GB',{maximumFractionDigits:2});
+const actor=()=>role==='customer'?'Customer':'Transporter';
+const allJobs=()=>Array.isArray(jobs)?jobs:[];
+const job=id=>allJobs().find(j=>String(j.id)===String(id));
+const tid=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2,8);
+const byId=id=>db.threads.find(t=>t.id===id);
+const current=()=>db.threads.filter(t=>!!job(t.jobId));
+function sync(){persistV63();draw();try{renderQuotes()}catch(e){}}
+function createRoot(){const sec=document.getElementById('quotes');if(!sec)return null;let root=document.getElementById('v63App');if(!root){root=document.createElement('div');root.id='v63App';sec.insertBefore(root,sec.firstChild)}return root}
+function draw(){
+ const root=createRoot();if(!root)return;
+ const roleName=actor(),threads=current().slice().sort((a,b)=>b.updated-a.updated);
+ const choices=allJobs().filter(j=>j.v62Customer||j.v63Customer||!j.isSeed).slice(0,150);
+ const jobOptions=choices.map(j=>'<option value="'+clean(j.id)+'">'+clean(j.car)+' · '+clean(j.from)+' → '+clean(j.to)+' (#'+clean(j.id)+')</option>').join('');
+ const threadOptions=threads.map(t=>{const j=job(t.jobId);return '<option value="'+clean(t.id)+'">#'+clean(t.jobId)+' '+clean(j?.car||'Job')+' · '+clean(t.status)+'</option>'}).join('');
+ if(selectedThread&&!byId(selectedThread))selectedThread=null;
+ if(!selectedThread&&threads.length)selectedThread=threads[0].id;
+ const chosen=byId(selectedThread);
+ let html='<div class="v63Box"><h3>1. Send quote or counteroffer</h3><div class="v63Muted">You are acting as '+roleName+'. Offers are shared between both demo roles on this browser.</div><div class="v63Grid" style="margin-top:12px">';
+ html+='<label>Job<select id="v63Job">'+(jobOptions||'<option value="">Post a customer job first</option>')+'</select></label>';
+ html+='<label>Negotiation<select id="v63Thread" onchange="v63Select(this.value)"><option value="">Start new negotiation</option>'+threadOptions+'</select></label>';
+ html+='<label>Offer amount (£)<input id="v63Price" type="number" min="1" step="0.01" placeholder="e.g. 175"></label>';
+ html+='<label>Action<select id="v63Action"><option value="offer">Send quote / counteroffer</option><option value="accept">Accept latest offer</option><option value="reject">Reject latest offer</option></select></label>';
+ html+='<label class="v63Wide">Optional message<textarea id="v63Note" placeholder="Add details or ask a question"></textarea></label></div>';
+ html+='<div class="v63Actions"><button class="btn" onclick="v63Send()">Send / respond</button><button class="btn secondary" onclick="v63Message()">Send message only</button></div></div>';
+ html+='<div class="v63Box"><h3>2. Negotiation inbox</h3><div class="v63Muted">Every quote, counteroffer and reply stays together under its job. Newest conversations appear first.</div>';
+ if(!threads.length)html+='<p>No negotiations yet. Post a job as Customer, switch to Transporter, then send a quote.</p>';
+ for(const t of threads){
+  const j=job(t.jobId),last=t.events.filter(e=>e.kind==='offer').at(-1);
+  html+='<details class="v63Thread" '+(selectedThread===t.id?'open':'')+'><summary onclick="v63Select(\''+clean(t.id)+'\')">'+clean(j?.car||'Vehicle')+' · '+clean(j?.from||'')+' → '+clean(j?.to||'')+' <span class="v63Status">'+clean(t.status)+'</span>'+(last?' · '+amount(last.amount):'')+'</summary>';
+  html+='<div class="v63Muted">Job #'+clean(t.jobId)+' · '+t.events.length+' history entries</div>';
+  for(const e of t.events){
+   const stamp=new Date(e.at).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});
+   html+='<div class="v63Event '+(e.from===roleName?'mine':'')+'"><b>'+clean(e.from)+'</b> · '+clean(e.kind==='offer'?'Offer '+amount(e.amount):e.kind==='accept'?'Accepted '+amount(e.amount):e.kind==='reject'?'Rejected offer': 'Message')+'</b><div class="v63Muted">'+clean(stamp)+'</div>'+(e.note?'<div>'+clean(e.note)+'</div>':'')+'</div>';
+  }
+  html+='<div class="v63Actions"><button class="btn secondary" onclick="v63Select(\''+clean(t.id)+'\');document.getElementById(\'v63Price\').focus()">Reply in offer box</button></div></details>';
+ }
+ html+='</div>';
+ root.innerHTML=html;
+ const ts=document.getElementById('v63Thread');if(ts&&selectedThread)ts.value=selectedThread;
+ if(chosen){const js=document.getElementById('v63Job');if(js)js.value=String(chosen.jobId);const last=chosen.events.filter(e=>e.kind==='offer').at(-1);if(last)document.getElementById('v63Price').value=last.amount}
+}
+window.v63Select=id=>{selectedThread=id||null;draw()};
+window.v63Send=()=>{
+ const id=document.getElementById('v63Job')?.value;
+ const action=document.getElementById('v63Action')?.value;
+ const price=Number(document.getElementById('v63Price')?.value);
+ const note=document.getElementById('v63Note')?.value.trim()||'';
+ let t=byId(document.getElementById('v63Thread')?.value);
+ if(!t&&selectedThread)t=byId(selectedThread);
+ if(!t&&(!id||!job(id)))return alert('Choose a job first.');
+ if(t&&t.status==='Booked')return alert('This booking is already confirmed.');
+ if(action==='offer'){
+  if(!Number.isFinite(price)||price<=0)return alert('Enter a valid offer amount.');
+  if(!t){
+   if(actor()!=='Transporter')return alert('A transporter must send the first quote. Switch to Transporter.');
+   t={id:tid(),jobId:id,status:'Awaiting customer',events:[],updated:Date.now()};db.threads.push(t);
+  }
+  const last=t.events.filter(e=>e.kind==='offer').at(-1);
+  if(last&&last.from===actor())return alert('Wait for the other role to reply before sending another offer.');
+  t.events.push({kind:'offer',from:actor(),amount:price,note,at:Date.now()});
+  t.status=actor()==='Customer'?'Awaiting transporter':'Awaiting customer';
+ }else{
+  if(!t)return alert('Select an existing negotiation.');
+  const last=t.events.filter(e=>e.kind==='offer').at(-1);
+  if(!last||last.from===actor())return alert('Only the recipient can accept or reject the latest offer.');
+  t.events.push({kind:action,from:actor(),amount:last.amount,note,at:Date.now()});
+  t.status=action==='accept'?'Booked':'Declined';
+ }
+ t.updated=Date.now();selectedThread=t.id;sync();
+};
+window.v63Message=()=>{
+ const t=byId(document.getElementById('v63Thread')?.value)||byId(selectedThread);
+ const note=document.getElementById('v63Note')?.value.trim();
+ if(!t||!note)return alert('Choose a negotiation and write a message.');
+ t.events.push({kind:'message',from:actor(),note,at:Date.now()});t.updated=Date.now();selectedThread=t.id;sync();
+};
+const previousSetRole=setRole;setRole=function(){previousSetRole.apply(this,arguments);draw()};
+const previousSetTab=setTab;setTab=function(){previousSetTab.apply(this,arguments);if(activeTab==='quotes')draw()};
+const previousPostJob=postJob;postJob=function(){const before=new Set(jobs.map(j=>j.id));previousPostJob.apply(this,arguments);const newJob=jobs.find(j=>!before.has(j.id));if(newJob){newJob.v63Customer=true;persist();draw()}};
+const previousReset=resetDemo;resetDemo=function(){const count=jobs.length;previousReset.apply(this,arguments);if(jobs.length!==count){db={threads:[]};selectedThread=null;persistV63()}draw()};
+const previousRenderQuotes=renderQuotes;renderQuotes=function(){previousRenderQuotes.apply(this,arguments);draw()};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',draw);else draw();
+window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
+})();
 </script></body></html>
