@@ -1779,4 +1779,75 @@ window.__v63Debug={state:()=>JSON.parse(JSON.stringify(db)),draw};
  start();
  window.__shiftdMapDiagnostics=()=>({mode,zoom:z,loadedTiles:loads,failedTiles:failures,visibleTiles:root.querySelectorAll('.v66-tiles img').length,status:status?.textContent||'',mapClass:root.className});
 })();
+</script>
+<style id="v69-route-style">
+#v69Planner{margin-top:12px;padding:16px;border:1px solid #315878;border-radius:12px;background:#10283e;color:#e7f3ff}
+#v69Planner .v69-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+#v69Planner label{font-size:12px;color:#b8d1e8;display:block}
+#v69Planner input{display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:10px;border:1px solid #456681;border-radius:7px;background:#0a1d30;color:#fff}
+#v69Planner button{padding:10px 14px;border:1px solid #4984a8;border-radius:8px;background:#19557a;color:white;font-weight:700;cursor:pointer}
+#v69Planner button:disabled{opacity:.5}
+#v69Result{margin-top:12px;line-height:1.7}
+#v69Result strong{color:#fff}
+#ukMap .v69-route{position:absolute;inset:0;z-index:2;pointer-events:none;width:100%;height:100%;overflow:hidden}
+@media(max-width:580px){#v69Planner .v69-grid{grid-template-columns:1fr}}
+</style>
+<script id="v69-road-route-planner">
+(function(){
+ const map=document.getElementById('ukMap'),selection=document.getElementById('mapSelection');if(!map||!selection)return;
+ const planner=document.createElement('div');planner.id='v69Planner';
+ planner.innerHTML='<strong>Road route & quote estimator</strong><p class="sub">Select a job pin, then calculate a road-based collection and delivery journey. Add your own start and finish for extra mileage.</p><div class="v69-grid"><label>Driver starting town / postcode<input id="v69Start" placeholder="Optional, e.g. Luton"></label><label>Driver finishing town / postcode<input id="v69Finish" placeholder="Optional, e.g. Birmingham"></label></div><button id="v69Calculate" type="button">Calculate driving route</button><div id="v69Result" role="status">Select a job on the map to begin.</div>';
+ selection.insertAdjacentElement('afterend',planner);
+ let selected=null,routePoints=null,routeId=0,cache=new Map();
+ const output=document.getElementById('v69Result'),button=document.getElementById('v69Calculate');
+ const miles=meters=>(meters/1609.344).toFixed(1);
+ const duration=seconds=>{const m=Math.round(seconds/60);return Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m'};
+ const safe=t=>String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ async function geocode(q){
+  const key=String(q||'').trim().toLowerCase();if(!key)throw Error('Missing location');
+  if(cache.has(key))return cache.get(key);
+  const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=gb,ie&q='+encodeURIComponent(q);
+  const response=await fetch(url,{headers:{'Accept':'application/json'}});if(!response.ok)throw Error('Location lookup unavailable ('+response.status+')');
+  const data=await response.json();if(!data.length)throw Error('Could not locate '+q);
+  const result=[Number(data[0].lon),Number(data[0].lat)];cache.set(key,result);return result;
+ }
+ async function drive(points){
+  const url='https://router.project-osrm.org/route/v1/driving/'+points.map(p=>p.join(',')).join(';')+'?overview=full&geometries=geojson&steps=false';
+  const response=await fetch(url);if(!response.ok)throw Error('Routing service unavailable ('+response.status+')');
+  const data=await response.json();if(data.code!=='Ok'||!data.routes?.length)throw Error('No drivable route was returned');
+  return data.routes[0];
+ }
+ function draw(){
+  map.querySelector('.v69-route')?.remove();if(!routePoints||!map.classList.contains('v66-live'))return;
+  const imgs=[...map.querySelectorAll('.v66-tiles img')];if(!imgs.length)return;
+  const sample=imgs[0],src=sample.src.match(/\/(\d+)\/(\d+)\/(\d+)\.png/);if(!src)return;
+  const z=Number(src[1]),tileX=Number(src[2]),tileY=Number(src[3]),left=parseFloat(sample.style.left),top=parseFloat(sample.style.top),scale=256*2**z;
+  const xy=(lon,lat)=>{const sin=Math.max(-.9999,Math.min(.9999,Math.sin(lat*Math.PI/180)));const x=(lon+180)/360*scale,y=(.5-Math.log((1+sin)/(1-sin))/(4*Math.PI))*scale;return [x-(tileX*256-left),y-(tileY*256-top)]};
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','v69-route');svg.setAttribute('viewBox','0 0 '+map.clientWidth+' '+map.clientHeight);
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',routePoints.map((p,i)=>{const [x,y]=xy(p[0],p[1]);return (i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}).join(' '));path.setAttribute('fill','none');path.setAttribute('stroke','#ffb629');path.setAttribute('stroke-width','5');path.setAttribute('stroke-linecap','round');path.setAttribute('stroke-linejoin','round');path.setAttribute('opacity','.92');svg.appendChild(path);map.appendChild(svg);
+ }
+ const observer=new MutationObserver(()=>{if(routePoints&&!map.querySelector('.v69-route')&&map.querySelector('.v66-tiles img'))draw()});observer.observe(map,{childList:true});
+ const previous=window.selectMapJob;
+ window.selectMapJob=function(id){if(typeof previous==='function')previous(id);selected=jobs.find(j=>j.id===id)||null;routePoints=null;map.querySelector('.v69-route')?.remove();output.textContent=selected?'Selected: '+selected.car+' · '+selected.from+' → '+selected.to+'. Press Calculate driving route.':'Select a job pin.'};
+ button.addEventListener('click',async()=>{
+  if(!selected){output.textContent='Select a job pin first.';return}
+  const current=++routeId;button.disabled=true;output.textContent='Finding collection and delivery roads…';
+  try{
+   const start=document.getElementById('v69Start').value.trim(),finish=document.getElementById('v69Finish').value.trim();
+   const pickup=await geocode(selected.from),drop=await geocode(selected.to);
+   const [job,full,baseline]=await Promise.all([
+    drive([pickup,drop]),
+    start||finish?(async()=>{const a=start?await geocode(start):pickup,b=finish?await geocode(finish):drop;return drive([a,pickup,drop,b])})():Promise.resolve(null),
+    start&&finish?(async()=>drive([await geocode(start),await geocode(finish)]))():Promise.resolve(null)
+   ]);
+   if(current!==routeId)return;
+   const actual=full||job,extra=baseline?Math.max(0,actual.distance-baseline.distance):null;
+   routePoints=actual.geometry.coordinates;draw();
+   const rate=1.5,quote=actual.distance/1609.344*rate;
+   output.innerHTML='<strong>Collection → delivery:</strong> '+miles(job.distance)+' miles · '+duration(job.duration)+'<br><strong>'+(full?'Full driver journey':'Job journey')+':</strong> '+miles(actual.distance)+' miles · '+duration(actual.duration)+(extra!==null?'<br><strong>Extra driving vs direct driver route:</strong> +'+miles(extra)+' miles · +'+duration(Math.max(0,actual.duration-baseline.duration)):'<br><small>Add both driver endpoints to calculate detour mileage.</small>')+'<br><strong>Illustrative transport estimate:</strong> £'+Math.round(quote)+' <small>(£'+rate.toFixed(2)+'/mile example only; excludes loading, fuel adjustments, tolls, VAT and platform fees)</small><br><small>Road geometry from OSRM public demo service. Route and duration are estimates, not live traffic.</small>';
+  }catch(err){if(current===routeId)output.textContent='Could not calculate route: '+err.message+'. Check town names or try again later.'}
+  finally{if(current===routeId)button.disabled=false}
+ });
+ window.__shiftdRouteTest=()=>({selectedJob:selected?.id||null,routePoints:routePoints?.length||0,buttonDisabled:button.disabled,result:output.textContent});
+})();
 </script></body></html>
